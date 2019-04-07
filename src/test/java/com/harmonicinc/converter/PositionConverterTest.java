@@ -1,13 +1,13 @@
 package com.harmonicinc.converter;
 
-import com.sun.javafx.image.IntPixelGetter;
 import org.junit.Test;
 import org.modelmapper.AbstractConverter;
 import org.modelmapper.Converter;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.PropertyMap;
-import org.modelmapper.spi.MappingContext;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 
 import static org.junit.Assert.*;
@@ -16,6 +16,15 @@ public class PositionConverterTest {
     static class A1 {
         String name;
         B1 b1;
+        List<E1> e1s;
+
+        public List<E1> getE1s() {
+            return e1s;
+        }
+
+        public void setE1s(List<E1> e1s) {
+            this.e1s = e1s;
+        }
 
         public B1 getB1() {
             return b1;
@@ -55,10 +64,27 @@ public class PositionConverterTest {
         }
     }
 
+    enum E1 {
+        E_1, E_2, E_3, E_EX_1, E_EX_2
+    }
+
+    enum E2 {
+        E_1, E_2, E_3
+    }
+
 
     static class A2 {
         String title;
         B2 b2;
+        List<E2> es;
+
+        public List<E2> getEs() {
+            return es;
+        }
+
+        public void setEs(List<E2> es) {
+            this.es = es;
+        }
 
         public B2 getB2() {
             return b2;
@@ -82,12 +108,13 @@ public class PositionConverterTest {
             if (o == null || getClass() != o.getClass()) return false;
             A2 a2 = (A2) o;
             return Objects.equals(title, a2.title) &&
-                    Objects.equals(b2, a2.b2);
+                    Objects.equals(b2, a2.b2) &&
+                    Objects.equals(es, a2.es);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(title, b2);
+            return Objects.hash(title, b2, es);
         }
 
         @Override
@@ -95,6 +122,7 @@ public class PositionConverterTest {
             return "A2{" +
                     "title='" + title + '\'' +
                     ", b2=" + b2 +
+                    ", e1s=" + es +
                     '}';
         }
     }
@@ -146,6 +174,23 @@ public class PositionConverterTest {
     public void convert() {
         ModelMapper modelMapper = new ModelMapper();
 
+        modelMapper.createTypeMap(E1.class, E2.class).setConverter(new AbstractConverter<E1, E2>() {
+            @Override
+            protected E2 convert(E1 e1) {
+                if (e1 == null) {
+                    return null;
+                }
+                switch (e1) {
+                    case E_1:
+                        return E2.E_1;
+                    case E_2:
+                        return E2.E_2;
+                    default:
+                        return E2.E_3;
+                }
+            }
+        });
+
         Converter<String, Integer> converter = mappingContext -> mappingContext.getSource() == null ? null : mappingContext.getSource().length();
 
         modelMapper.addMappings(new PropertyMap<B1, B2>() {
@@ -162,6 +207,7 @@ public class PositionConverterTest {
             protected void configure() {
                 map().setTitle(source.getName());
                 map(source.getB1(), destination.getB2());
+                map(source.getE1s(), destination.getEs());
             }
         });
 
@@ -172,6 +218,7 @@ public class PositionConverterTest {
         A1 a1 = new A1();
         a1.setName("asdfdsfdf");
         a1.setB1(b1);
+        a1.setE1s(Collections.singletonList(E1.E_EX_1));
 
         B2 b2Expected = new B2();
         b2Expected.setTextLength(20);
@@ -179,8 +226,10 @@ public class PositionConverterTest {
         A2 expected = new A2();
         expected.setB2(b2Expected);
         expected.setTitle("asdfdsfdf");
+        expected.setEs(Collections.singletonList(E2.E_3));
 
         A2 actual = modelMapper.map(a1, A2.class);
+
 
         assertEquals(expected, actual);
         modelMapper.validate();
